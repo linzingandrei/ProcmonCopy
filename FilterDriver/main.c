@@ -21,6 +21,7 @@ BOOLEAN gImageMonitoringEnabled = FALSE;
 BOOLEAN gThreadMonitoringEnabled = FALSE;
 BOOLEAN gRegistryMonitoringEnabled = FALSE;
 BOOLEAN gFileMonitoringEnabled = FALSE;
+BOOLEAN gNetworkMonitoringEnabled = FALSE;
 
 DRIVER_INITIALIZE DriverEntry;
 
@@ -2161,6 +2162,10 @@ HandleUserMessage(WCHAR* message, ULONG messageLength)
         {
             fileMonitoringEnabled = TRUE;
 		}
+        else if (wcsncmp(current, L"network", wcslen(L"network")) == 0)
+        {
+            gNetworkMonitoringEnabled = TRUE;
+        }
 
         current = next;
     }

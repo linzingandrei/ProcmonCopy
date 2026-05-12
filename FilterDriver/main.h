@@ -37,6 +37,7 @@ extern BOOLEAN gImageMonitoringEnabled;
 extern BOOLEAN gThreadMonitoringEnabled;
 extern BOOLEAN gRegistryMonitoringEnabled;
 extern BOOLEAN gFileMonitoringEnabled;
+extern BOOLEAN gNetworkMonitoringEnabled;
 
 extern DRIVER_INITIALIZE DriverEntry;
 

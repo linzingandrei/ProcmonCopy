@@ -1,8 +1,7 @@
-
-
-
 #include "networking.h"
 
+#define HTONS(x) ((USHORT)((((x) & 0xFF00) >> 8) | \
+                            (((x) & 0x00FF) << 8)))
 
 #define UINT_MAX 0xFFFFFFFF
 #define PROTOCOL_TCP 6
@@ -11,6 +10,20 @@
 
 #define UTILS_TAG_UNICODE_STRING 'utus'
 
+typedef struct _MY_WORK_ITEM_CONTEXT
+{
+    FWP_BYTE_BLOB* appId;
+    UINT8 localAddressType;
+    UINT32 localAddress;
+    BYTE localAddressv6[16];
+    UINT16 localPort;
+    UINT8 remoteAddressType;
+    UINT32 remoteAddress;
+    BYTE remoteAddressv6[16];
+    UINT16 remotePort;
+    UINT8 protocol;
+    UINT8 icmpType;
+} MY_WORK_ITEM_CONTEXT, * PMY_WORK_ITEM_CONTEXT;
 
 ///
 /// **************************************************************************************************
@@ -491,26 +504,37 @@ DefaultClassifyFn(
         ok = TRUE;
     }
 
+    struct in_addr ipAddress = { 0 };
+    WCHAR localIpAddressBuffer[100] = { 0 };
+    ULONG localIpAddressBufferSize = ARRAYSIZE(localIpAddressBuffer);
+    WCHAR remoteIpAddressBuffer[100] = { 0 };
+    ULONG remoteIpAddressBufferSize = ARRAYSIZE(remoteIpAddressBuffer);
+    WCHAR localIpVersion[10] = { 0 };
+    WCHAR remoteIpVersion[10] = { 0 };
+
     switch (localAddress->value.type)
     {
     case FWP_UINT32:
     {
-        DbgPrintEx(
-            0,
-            0,
-            "Local ip: %u.%u.%u.%u:%u\n",
-            (localAddress->value.uint32 >> 24) & 0xFF,
-            (localAddress->value.uint32 >> 16) & 0xFF,
-            (localAddress->value.uint32 >> 8) & 0xFF,
-            (localAddress->value.uint32) & 0xFF,
-            localPort->value.uint16
-        );
+        wcscpy_s(localIpVersion, sizeof(localIpVersion) / sizeof(WCHAR), L"IPv4");
+
+        ipAddress.S_un.S_addr = RtlUlongByteSwap(localAddress->value.uint32);
+        RtlIpv4AddressToStringExW(&ipAddress, localAddress->value.uint16, &localIpAddressBuffer[0], &localIpAddressBufferSize);
     }
     break;
 
     case FWP_UINT64:
     {
-        //GetICMPv6TypeValue(icmp->value.uint8, icmpTypeString);
+        wcscpy_s(localIpVersion, sizeof(localIpVersion) / sizeof(WCHAR), L"IPv6");
+
+        /*IN6_ADDR ipv6Address;
+
+        ipv6Address.u.Word[0] = HTONS((USHORT)((*(context->localAddressv6) >> 48) & 0xFFFF));
+        ipv6Address.u.Word[1] = HTONS((USHORT)((*(context->localAddressv6) >> 32) & 0xFFFF));
+        ipv6Address.u.Word[2] = HTONS((USHORT)((*(context->localAddressv6) >> 16) & 0xFFFF));
+        ipv6Address.u.Word[3] = HTONS((USHORT)(*(context->localAddressv6) & 0xFFFF));
+
+        RtlIpv6AddressToStringExW(&ipv6Address, 0, context->localPort, &localIpAddressBuffer[0], &localIpAddressBufferSize);*/
     }
     break;
 
@@ -525,21 +549,25 @@ DefaultClassifyFn(
     {
     case FWP_UINT32:
     {
-        DbgPrintEx(
-            0,
-            0,
-            "Remote ip: %u.%u.%u.%u:%u\n",
-            (remoteAddress->value.uint32 >> 24) & 0xFF,
-            (remoteAddress->value.uint32 >> 16) & 0xFF,
-            (remoteAddress->value.uint32 >> 8) & 0xFF,
-            (remoteAddress->value.uint32) & 0xFF,
-            remotePort->value.uint16
-        );
+        wcscpy_s(remoteIpVersion, sizeof(remoteIpVersion) / sizeof(WCHAR), L"IPv4");
+
+        ipAddress.S_un.S_addr = RtlUlongByteSwap(remoteAddress->value.uint32);
+        RtlIpv4AddressToStringExW(&ipAddress, remoteAddress->value.uint16, &remoteIpAddressBuffer[0], &remoteIpAddressBufferSize);
     }
     break;
 
     case FWP_UINT64:
     {
+        wcscpy_s(remoteIpVersion, sizeof(remoteIpVersion) / sizeof(WCHAR), L"IPv6");
+
+        /*IN6_ADDR ipv6Address;
+
+        ipv6Address.u.Word[0] = HTONS((USHORT)((*(context->remoteAddressv6) >> 48) & 0xFFFF));
+        ipv6Address.u.Word[1] = HTONS((USHORT)((*(context->remoteAddressv6) >> 32) & 0xFFFF));
+        ipv6Address.u.Word[2] = HTONS((USHORT)((*(context->remoteAddressv6) >> 16) & 0xFFFF));
+        ipv6Address.u.Word[3] = HTONS((USHORT)(*(context->remoteAddressv6) & 0xFFFF));
+
+        RtlIpv6AddressToStringExW(&ipv6Address, 0, context->remotePort, &remoteIpAddressBuffer[0], &remoteIpAddressBufferSize);*/
     }
     break;
 
@@ -550,77 +578,116 @@ DefaultClassifyFn(
     break;
     }
 
-    DbgPrintEx(
-        0,
-        0,
-        "Protocol: %ws\n",
-        protocolString
-    );
-
-    if (icmpTypeString[0] != L'\0')
+    if (gNetworkMonitoringEnabled == TRUE)
     {
-        DbgPrintEx(
-            0,
-            0,
-            "ICMP Type: %ws\n",
-            icmpTypeString
-        );
-    }
-    icmpTypeString[0] = L'\0';
-
-    if (ok)
-    {
-        DbgPrintEx(
-            0,
-            0,
-            "App Path: %wZ\n",
-            &appPathString
-        );
-    }
-
-   PMY_CUSTOM_MESSAGE msg = ExAllocatePool2(
-        POOL_FLAG_NON_PAGED,
-        sizeof(MY_CUSTOM_MESSAGE),
-        'gsmT'
-    );
-
-    if (!msg)
-    {
-        DbgPrintEx(
-            0,
-            0,
-            "Failed to allocate memory for message.\n"
-		);
-    }
-
-    if (msg)
-    {
-        LARGE_INTEGER timestamp;
-        KeQuerySystemTime(&timestamp);
-
-        RtlZeroMemory(msg, sizeof(*msg));
-
-        NTSTATUS status = RtlStringCchPrintfW(
-            msg->replyData.message,
-            1024,
-            L"[%llu]\r\n",
-            timestamp.QuadPart
+        PMY_CUSTOM_MESSAGE msg = ExAllocatePool2(
+            POOL_FLAG_NON_PAGED,
+            sizeof(MY_CUSTOM_MESSAGE),
+            'gsmT'
         );
 
-        if (!NT_SUCCESS(status))
+        if (!msg)
         {
             DbgPrintEx(
                 0,
                 0,
-                "RtlStringCchPrintfW failed with status 0x%X\n",
-                status
+                "Failed to allocate memory for message.\n"
             );
         }
-        else
-        {
-            msg->replyData.messageLength = (ULONG)wcslen(msg->replyData.message) * sizeof(WCHAR);
 
-            TpEnqueueWorkItem(&gThreadPool->tp, SendWorker, msg);
+        if (msg)
+        {
+            LARGE_INTEGER timestamp;
+            KeQuerySystemTime(&timestamp);
+
+            RtlZeroMemory(msg, sizeof(*msg));
+
+            NTSTATUS status = STATUS_UNSUCCESSFUL;
+
+            if (icmpTypeString[0] != L'\0')
+            {
+                if (!ok)
+                {
+                    status = RtlStringCchPrintfW(
+                        msg->replyData.message,
+                        1024,
+                        L"Timestamp: %llu\n%ws/%ws\nLocal ip: %ws\nRemote ip: %ws\nProtocol: %ws\nICMP: %ws\r\n",
+                        timestamp.QuadPart,
+                        localIpVersion,
+                        remoteIpVersion,
+                        localIpAddressBuffer,
+                        remoteIpAddressBuffer,
+                        protocolString,
+                        icmpTypeString
+                    );
+                }
+                else
+                {
+                    status = RtlStringCchPrintfW(
+                        msg->replyData.message,
+                        1024,
+                        L"Timestamp: %llu\n%ws/%ws\nLocal ip: %ws\nRemote ip: %ws\nProtocol: %ws\nICMP: %ws\nApp path: %wZ\r\n",
+                        timestamp.QuadPart,
+                        localIpVersion,
+                        remoteIpVersion,
+                        localIpAddressBuffer,
+                        remoteIpAddressBuffer,
+                        protocolString,
+                        icmpTypeString,
+                        &appPathString
+                    );
+                }
+
+                icmpTypeString[0] = L'\0';
+            }
+            else
+            {
+                if (!ok)
+                {
+                    status = RtlStringCchPrintfW(
+                        msg->replyData.message,
+                        1024,
+                        L"Timestamp: %llu\n%ws/%ws\nLocal ip: %ws\nRemote ip: %ws\nProtocol: %ws\r\n",
+                        timestamp.QuadPart,
+                        localIpVersion,
+                        remoteIpVersion,
+                        localIpAddressBuffer,
+                        remoteIpAddressBuffer,
+                        protocolString
+                    );
+                }
+                else
+                {
+                    status = RtlStringCchPrintfW(
+                        msg->replyData.message,
+                        1024,
+                        L"Timestamp: %llu\n%ws/%ws\nLocal ip: %ws\nRemote ip: %ws\nProtocol: %ws\nApp path: %wZ\r\n",
+                        timestamp.QuadPart,
+                        localIpVersion,
+                        remoteIpVersion,
+                        localIpAddressBuffer,
+                        remoteIpAddressBuffer,
+                        protocolString,
+                        &appPathString
+                    );
+                }
+            }
+
+            if (!NT_SUCCESS(status))
+            {
+                DbgPrintEx(
+                    0,
+                    0,
+                    "RtlStringCchPrintfW failed with status 0x%X\n",
+                    status
+                );
+            }
+            else
+            {
+                msg->replyData.messageLength = (ULONG)wcslen(msg->replyData.message) * sizeof(WCHAR);
+
+                TpEnqueueWorkItem(&gThreadPool->tp, SendWorker, msg);
+            }
         }
     }
 }
