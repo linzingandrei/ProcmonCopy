@@ -504,22 +504,32 @@ DefaultClassifyFn(
         ok = TRUE;
     }
 
-    struct in_addr ipAddress = { 0 };
-    WCHAR localIpAddressBuffer[100] = { 0 };
-    ULONG localIpAddressBufferSize = ARRAYSIZE(localIpAddressBuffer);
-    WCHAR remoteIpAddressBuffer[100] = { 0 };
-    ULONG remoteIpAddressBufferSize = ARRAYSIZE(remoteIpAddressBuffer);
+    //struct in_addr ipAddress = { 0 };
+    //WCHAR localIpAddressBuffer[100] = { 0 };
+    //ULONG localIpAddressBufferSize = ARRAYSIZE(localIpAddressBuffer);
+    //WCHAR remoteIpAddressBuffer[100] = { 0 };
+    //ULONG remoteIpAddressBufferSize = ARRAYSIZE(remoteIpAddressBuffer);
     WCHAR localIpVersion[10] = { 0 };
     WCHAR remoteIpVersion[10] = { 0 };
 
+
+    WCHAR localIpBuffer[100];
     switch (localAddress->value.type)
     {
     case FWP_UINT32:
     {
         wcscpy_s(localIpVersion, sizeof(localIpVersion) / sizeof(WCHAR), L"IPv4");
 
-        ipAddress.S_un.S_addr = RtlUlongByteSwap(localAddress->value.uint32);
-        RtlIpv4AddressToStringExW(&ipAddress, localAddress->value.uint16, &localIpAddressBuffer[0], &localIpAddressBufferSize);
+        RtlStringCchPrintfW(
+            localIpBuffer,
+            RTL_NUMBER_OF(localIpBuffer),
+            L"%u.%u.%u.%u:%u",
+            (localAddress->value.uint32 >> 24) & 0xFF,
+            (localAddress->value.uint32 >> 16) & 0xFF,
+            (localAddress->value.uint32 >> 8) & 0xFF,
+            (localAddress->value.uint32) & 0xFF,
+            localPort->value.uint16
+        );
     }
     break;
 
@@ -527,14 +537,22 @@ DefaultClassifyFn(
     {
         wcscpy_s(localIpVersion, sizeof(localIpVersion) / sizeof(WCHAR), L"IPv6");
 
-        /*IN6_ADDR ipv6Address;
+        BYTE* ipv6 = localAddress->value.byteArray16->byteArray16;
 
-        ipv6Address.u.Word[0] = HTONS((USHORT)((*(context->localAddressv6) >> 48) & 0xFFFF));
-        ipv6Address.u.Word[1] = HTONS((USHORT)((*(context->localAddressv6) >> 32) & 0xFFFF));
-        ipv6Address.u.Word[2] = HTONS((USHORT)((*(context->localAddressv6) >> 16) & 0xFFFF));
-        ipv6Address.u.Word[3] = HTONS((USHORT)(*(context->localAddressv6) & 0xFFFF));
-
-        RtlIpv6AddressToStringExW(&ipv6Address, 0, context->localPort, &localIpAddressBuffer[0], &localIpAddressBufferSize);*/
+        RtlStringCchPrintfW(
+            localIpBuffer,
+            RTL_NUMBER_OF(localIpBuffer),
+            L"%x:%x:%x:%x:%x:%x:%x:%x:%u",
+            (ipv6[0] << 8) | ipv6[1],
+            (ipv6[2] << 8) | ipv6[3],
+            (ipv6[4] << 8) | ipv6[5],
+            (ipv6[6] << 8) | ipv6[7],
+            (ipv6[8] << 8) | ipv6[9],
+            (ipv6[10] << 8) | ipv6[11],
+            (ipv6[12] << 8) | ipv6[13],
+            (ipv6[14] << 8) | ipv6[15],
+            remotePort->value.uint16
+        );
     }
     break;
 
@@ -545,14 +563,23 @@ DefaultClassifyFn(
     break;
     }
 
+    WCHAR remoteIpBuffer[100];
     switch (remoteAddress->value.type)
     {
     case FWP_UINT32:
     {
         wcscpy_s(remoteIpVersion, sizeof(remoteIpVersion) / sizeof(WCHAR), L"IPv4");
 
-        ipAddress.S_un.S_addr = RtlUlongByteSwap(remoteAddress->value.uint32);
-        RtlIpv4AddressToStringExW(&ipAddress, remoteAddress->value.uint16, &remoteIpAddressBuffer[0], &remoteIpAddressBufferSize);
+        RtlStringCchPrintfW(
+            remoteIpBuffer,
+            RTL_NUMBER_OF(remoteIpBuffer),
+            L"%u.%u.%u.%u:%u",
+            (remoteAddress->value.uint32 >> 24) & 0xFF,
+            (remoteAddress->value.uint32 >> 16) & 0xFF,
+            (remoteAddress->value.uint32 >> 8) & 0xFF,
+            (remoteAddress->value.uint32) & 0xFF,
+            remotePort->value.uint16
+        );
     }
     break;
 
@@ -560,14 +587,22 @@ DefaultClassifyFn(
     {
         wcscpy_s(remoteIpVersion, sizeof(remoteIpVersion) / sizeof(WCHAR), L"IPv6");
 
-        /*IN6_ADDR ipv6Address;
+        BYTE* ipv6 = remoteAddress->value.byteArray16->byteArray16;
 
-        ipv6Address.u.Word[0] = HTONS((USHORT)((*(context->remoteAddressv6) >> 48) & 0xFFFF));
-        ipv6Address.u.Word[1] = HTONS((USHORT)((*(context->remoteAddressv6) >> 32) & 0xFFFF));
-        ipv6Address.u.Word[2] = HTONS((USHORT)((*(context->remoteAddressv6) >> 16) & 0xFFFF));
-        ipv6Address.u.Word[3] = HTONS((USHORT)(*(context->remoteAddressv6) & 0xFFFF));
-
-        RtlIpv6AddressToStringExW(&ipv6Address, 0, context->remotePort, &remoteIpAddressBuffer[0], &remoteIpAddressBufferSize);*/
+        RtlStringCchPrintfW(
+            remoteIpBuffer,
+            RTL_NUMBER_OF(remoteIpBuffer),
+            L"%x:%x:%x:%x:%x:%x:%x:%x:%u",
+            (ipv6[0] << 8) | ipv6[1],
+            (ipv6[2] << 8) | ipv6[3],
+            (ipv6[4] << 8) | ipv6[5],
+            (ipv6[6] << 8) | ipv6[7],
+            (ipv6[8] << 8) | ipv6[9],
+            (ipv6[10] << 8) | ipv6[11],
+            (ipv6[12] << 8) | ipv6[13],
+            (ipv6[14] << 8) | ipv6[15],
+            remotePort->value.uint16
+        );
     }
     break;
 
@@ -578,6 +613,7 @@ DefaultClassifyFn(
     break;
     }
 
+	DbgPrintEx(0, 0, "gNetworkMonitoringEnabled: %d\n", gNetworkMonitoringEnabled);
     if (gNetworkMonitoringEnabled == TRUE)
     {
         PMY_CUSTOM_MESSAGE msg = ExAllocatePool2(
@@ -615,8 +651,8 @@ DefaultClassifyFn(
                         timestamp.QuadPart,
                         localIpVersion,
                         remoteIpVersion,
-                        localIpAddressBuffer,
-                        remoteIpAddressBuffer,
+                        localIpBuffer,
+                        remoteIpBuffer,
                         protocolString,
                         icmpTypeString
                     );
@@ -630,8 +666,8 @@ DefaultClassifyFn(
                         timestamp.QuadPart,
                         localIpVersion,
                         remoteIpVersion,
-                        localIpAddressBuffer,
-                        remoteIpAddressBuffer,
+                        localIpBuffer,
+                        remoteIpBuffer,
                         protocolString,
                         icmpTypeString,
                         &appPathString
@@ -651,8 +687,8 @@ DefaultClassifyFn(
                         timestamp.QuadPart,
                         localIpVersion,
                         remoteIpVersion,
-                        localIpAddressBuffer,
-                        remoteIpAddressBuffer,
+                        localIpBuffer,
+                        remoteIpBuffer,
                         protocolString
                     );
                 }
@@ -665,8 +701,8 @@ DefaultClassifyFn(
                         timestamp.QuadPart,
                         localIpVersion,
                         remoteIpVersion,
-                        localIpAddressBuffer,
-                        remoteIpAddressBuffer,
+                        localIpBuffer,
+                        remoteIpBuffer,
                         protocolString,
                         &appPathString
                     );

@@ -2135,6 +2135,7 @@ HandleUserMessage(WCHAR* message, ULONG messageLength)
     BOOLEAN threadMonitoringFlag = FALSE;
 	BOOLEAN registryMonitoringFlag = FALSE;
     BOOLEAN fileMonitoringEnabled = FALSE;
+    BOOLEAN networkMonitoringEnabled = FALSE;
 
     WCHAR* current = message;
 
@@ -2164,7 +2165,7 @@ HandleUserMessage(WCHAR* message, ULONG messageLength)
 		}
         else if (wcsncmp(current, L"network", wcslen(L"network")) == 0)
         {
-            gNetworkMonitoringEnabled = TRUE;
+            networkMonitoringEnabled = TRUE;
         }
 
         current = next;
@@ -2228,6 +2229,18 @@ HandleUserMessage(WCHAR* message, ULONG messageLength)
         else
         {
             gFileMonitoringEnabled = FALSE;
+        }
+    }
+
+    if (networkMonitoringEnabled)
+    {
+        if (gNetworkMonitoringEnabled == FALSE)
+        {
+            gNetworkMonitoringEnabled = TRUE;
+        }
+        else
+        {
+            gNetworkMonitoringEnabled = FALSE;
         }
     }
 }
