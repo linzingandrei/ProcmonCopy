@@ -983,7 +983,7 @@ int main() {
 
 	MY_CUSTOM_MESSAGE customMessage = { 0 };
 
-    printf("Type any combination of process, image, thread, file, registry. Only after reopening this app the output file will be populated.\n");
+    printf("Type any combination of process, image, thread, file, registry, network.\n");
 
     hr = FilterConnectCommunicationPort(L"\\MyFilterPort", 0, NULL, 0, NULL, &port);
     if (IS_ERROR(hr)) {
