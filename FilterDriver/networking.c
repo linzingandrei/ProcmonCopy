@@ -421,6 +421,8 @@ void GetICMPv4TypeValue(UINT8 ICMPIndex, WCHAR* ICMPTypeValue)
 
 BOOLEAN IsHandleSocket(HANDLE handle)
 {
+    // Uncommenting __debugbreak() shows that it works but not always. sometimes the fileObject is garbage. Don't know how to fix + never detects remote shells
+     //__debugbreak();
     PFILE_OBJECT fileObject = NULL;
 
     NTSTATUS status = ObReferenceObjectByHandle(
@@ -691,6 +693,76 @@ VOID SendWorkerNetwork(PVOID ctx)
     }
 }
 
+VOID WorkerForReverseShellDetection(PVOID ctx)
+{
+    UNREFERENCED_PARAMETER(ctx);
+
+    //__debugbreak();
+    // Commented because it causes bugcheck sometimes, i dont know why. It also doesnt detect reverse shell but the is handle socket sometimes acuatlly has values inside of variabiles but most times it's just garbage.
+	/*PREV_SHELL_CTX revShellCtx = (PREV_SHELL_CTX)ctx;
+
+    if (KeGetCurrentIrql() == DISPATCH_LEVEL)
+    {
+        goto notCool;
+    }
+
+	HANDLE hProcess = revShellCtx->processHandle;
+
+    PEPROCESS process;
+    NTSTATUS status = PsLookupProcessByProcessId(hProcess, &process);
+
+    PROCESS_BASIC_INFORMATION processInformation;
+    UNREFERENCED_PARAMETER(processInformation);
+
+    if (!NT_SUCCESS(status))
+    {
+        goto notCool;
+    }
+
+    KeAttachProcess(process);
+
+    PPEB peb = PsGetProcessPeb(process);
+    UNREFERENCED_PARAMETER(peb);
+
+    PRTL_USER_PROCESS_PARAMETERS params = peb->ProcessParameters;
+    UNREFERENCED_PARAMETER(params);
+
+    HANDLE stdIn = params->StdInputHandle;
+	HANDLE stdOut = params->StdOutputHandle;
+	HANDLE stdErr = params->StdErrorHandle;
+
+	BOOLEAN isSocket = IsHandleSocket(stdIn);
+    if (isSocket)
+    {
+		DbgPrintEx(0, 0, "Process %d has a socket as standard input handle. Possible reverse shell.\n", (ULONG)(ULONG_PTR)hProcess);
+    }
+
+	isSocket = IsHandleSocket(stdOut);
+    if (isSocket)
+    {
+        DbgPrintEx(0, 0, "Process %d has a socket as standard input handle. Possible reverse shell.\n", (ULONG)(ULONG_PTR)hProcess);
+    }
+
+	isSocket = IsHandleSocket(stdErr);
+    if (isSocket)
+    {
+        DbgPrintEx(0, 0, "Process %d has a socket as standard input handle. Possible reverse shell.\n", (ULONG)(ULONG_PTR)hProcess);
+	}
+
+    if (process)
+    {
+        ObDereferenceObject(process);
+    }
+
+    KeDetachProcess();
+
+notCool:;
+    ExFreePoolWithTag(
+        revShellCtx,
+        'rscx'
+    );*/
+}
+
 void NTAPI
 DefaultClassifyFn(
     _In_ const FWPS_INCOMING_VALUES0* inFixedValues,
@@ -760,71 +832,26 @@ DefaultClassifyFn(
     }
 
     context->ok = ok;
+
+	context->protocol = protocol->value.uint8;
+    context->icmpType = icmp->value.uint8;
     
-  //  if (inMetaValues->currentMetadataValues & FWPS_METADATA_FIELD_TRANSPORT_ENDPOINT_HANDLE)
-  //  {
-		//HANDLE hProcess = (HANDLE)inMetaValues->transportEndpointHandle;
-  //      PEPROCESS process = NULL;
-  //      PROCESS_BASIC_INFORMATION processInformation;
-  //      UNREFERENCED_PARAMETER(processInformation);
+    /*if (inMetaValues->currentMetadataValues & FWPS_METADATA_FIELD_PROCESS_ID)
+    {
+		PREV_SHELL_CTX revShellCtx = NULL;
+        revShellCtx = ExAllocatePool2(
+            POOL_FLAG_NON_PAGED,
+            sizeof(PREV_SHELL_CTX),
+            'rscx'
+        );
 
-  //      NTSTATUS status = ObReferenceObjectByHandle(
-  //          hProcess,
-  //          FILE_ALL_ACCESS,
-  //          *PsProcessType,
-  //          UserMode,
-  //          (PVOID*)&process,
-  //          NULL
-  //      );
-  //      if (!NT_SUCCESS(status))
-  //      {
-  //          goto notCool;
-  //      }
+        HANDLE hProcess = (HANDLE)inMetaValues->processId;
+		revShellCtx->processHandle = hProcess;
 
-		//status = PsLookupProcessByProcessId((HANDLE)(ULONG_PTR)inMetaValues->processId, &process);
-  //      if (!NT_SUCCESS(status))
-  //      {
-  //          goto notCool;
-  //      }
-
-		//PPEB peb = PsGetProcessPeb(hProcess);
-  //      UNREFERENCED_PARAMETER(peb);
-
-  //      if (hProcess)
-  //      {
-  //          ObDereferenceObject(hProcess);
-  //      }
-
-      /*  HMODULE ntdll = LoadLibraryA("ntdll.dll");
-
-        NQIP NtQueryInformationProcess = (NQIP)GetProcAddress(ntdll, "NtQueryInformationProcess");
-
-        NtQueryInformationProcess(hProcess, ProcessBasicInformation, &processInformation, sizeof(processInformation), NULL);
-
-        PEB peb;
-        if (!ReadProcessMemory(hProcess, processInformation.PebBaseAddress, &peb, sizeof(peb), NULL))
-        {
-            goto notCool;
-        }
-
-        RTL_USER_PROCESS_PARAMETERS processParameters;
-        if (!ReadProcessMemory(hProcess, peb.ProcessParameters, &processParameters, sizeof(processParameters), NULL))
-        {
-            goto notCool;
-        }*/
+        //TpEnqueueWorkItem(&gThreadPool->tp, WorkerForReverseShellDetection, revShellCtx);
 
 
-
-   /* notCool:;
     }*/
-
-    //struct in_addr ipAddress = { 0 };
-    //WCHAR localIpAddressBuffer[100] = { 0 };
-    //ULONG localIpAddressBufferSize = ARRAYSIZE(localIpAddressBuffer);
-    //WCHAR remoteIpAddressBuffer[100] = { 0 };
-    //ULONG remoteIpAddressBufferSize = ARRAYSIZE(remoteIpAddressBuffer);
-    
-
 
     //WCHAR localIpBuffer[100];
     switch (localAddress->value.type)

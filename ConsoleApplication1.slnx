@@ -20,6 +20,7 @@
     <Platform Project="x64" />
     <Deploy />
   </Project>
+  <Project Path="IpBlocker/IpBlocker.vcxproj" Id="b6251446-2edb-4d60-ae40-a3e1720f0abd" />
   <Project Path="MainDriver/MainDriver.vcxproj">
     <Platform Project="x64" />
     <Build Solution="*|x86" Project="false" />
@@ -30,6 +31,7 @@
     <Platform Project="x64" />
     <Deploy />
   </Project>
+  <Project Path="RemoteShell/RemoteShell.vcxproj" Id="13117b0c-5213-4cf1-bc1b-1baa32cc5566" />
   <Project Path="UnitTest1/UnitTest1.vcxproj">
     <Build Solution="*|x86" Project="false" />
     <Build Solution="Debug|x64" Project="false" />
