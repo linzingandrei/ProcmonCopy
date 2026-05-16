@@ -49,6 +49,97 @@ vector<wstring> GetIpsOfWebsite(WCHAR* nodeName)
     }
 }
 
+int
+AddFilter(
+    HANDLE hEngine,
+	const FWP_BYTE_BLOB *pAppId,
+    const wstring &ip
+)
+{
+    FWPM_FILTER filter = { 0 };
+    FWPM_FILTER_CONDITION filterConditions[2];
+
+    for (int i = 0; i < 2; i++)
+    {
+        ZeroMemory(&filterConditions[i], sizeof(FWPM_FILTER_CONDITION));
+    }
+    filterConditions[0].fieldKey = FWPM_CONDITION_ALE_APP_ID;
+    filterConditions[0].matchType = FWP_MATCH_EQUAL;
+    filterConditions[0].conditionValue.type = FWP_BYTE_BLOB_TYPE;
+    filterConditions[0].conditionValue.byteBlob = (FWP_BYTE_BLOB*)pAppId;
+
+    IN_ADDR ipv4;
+    IN_ADDR ipv6;
+    int v4 = 0;
+
+    if (InetPtonW(AF_INET, ip.c_str(), &ipv4) == 1)
+    {
+        v4 = 1;
+
+        FWP_V4_ADDR_AND_MASK* ipAddrMask = (FWP_V4_ADDR_AND_MASK*)malloc(sizeof(FWP_V4_ADDR_AND_MASK));
+        if (!ipAddrMask)
+        {
+            return 1;
+        }
+
+        ZeroMemory(ipAddrMask, sizeof(FWP_V4_ADDR_AND_MASK));
+
+        ipAddrMask->addr = ipv4.S_un.S_addr;
+        ipAddrMask->mask = 0xFFFFFFFF;
+
+        filterConditions[1].fieldKey = FWPM_CONDITION_IP_REMOTE_ADDRESS;
+        filterConditions[1].matchType = FWP_MATCH_EQUAL;
+        filterConditions[1].conditionValue.type = FWP_V4_ADDR_MASK;
+        filterConditions[1].conditionValue.v4AddrMask = ipAddrMask;
+    }
+    else if (InetPtonW(AF_INET6, ip.c_str(), &ipv6) == 1)
+    {
+        FWP_V6_ADDR_AND_MASK* ipAddrMask = (FWP_V6_ADDR_AND_MASK*)malloc(sizeof(FWP_V6_ADDR_AND_MASK));
+        if (!ipAddrMask)
+        {
+            return 1;
+        }
+
+        ZeroMemory(ipAddrMask, sizeof(FWP_V6_ADDR_AND_MASK));
+
+        memcpy(&ipAddrMask->addr, &ipv6, sizeof(IN6_ADDR));
+        ipAddrMask->prefixLength = 128;
+
+        filterConditions[1].fieldKey = FWPM_CONDITION_IP_REMOTE_ADDRESS;
+        filterConditions[1].matchType = FWP_MATCH_EQUAL;
+        filterConditions[1].conditionValue.type = FWP_V6_ADDR_MASK;
+        filterConditions[1].conditionValue.v6AddrMask = ipAddrMask;
+    }
+    else
+    {
+        return 1;
+    }
+
+    ZeroMemory(&filter, sizeof(FWPM_FILTER));
+    
+    if (v4 == 1)
+    {
+        filter.layerKey = FWPM_LAYER_ALE_AUTH_CONNECT_V4;
+    }
+    else 
+    {
+        filter.layerKey = FWPM_LAYER_ALE_AUTH_CONNECT_V6;
+    }
+
+    filter.weight.type = FWP_EMPTY;
+    filter.numFilterConditions = 2;
+    filter.filterCondition = filterConditions;
+    filter.action.type = FWP_ACTION_BLOCK;
+
+    int res = FwpmFilterAdd(hEngine, &filter, NULL, NULL);
+    if (res != ERROR_SUCCESS)
+    {
+        return 1;
+    }
+
+    return 0;
+}
+
 int main()
 {
     WSAData wsa;
@@ -75,9 +166,6 @@ int main()
     //free(nodeName);
 
     WCHAR processName[512] = L"C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
-
-    FWPM_FILTER filter = { 0 };
-    FWPM_FILTER_CONDITION *filterConditions = (FWPM_FILTER_CONDITION*)malloc(ipStr.size() * sizeof(FWPM_FILTER_CONDITION));
     FWP_BYTE_BLOB* pAppId = NULL;
     DWORD error = NULL;
     HANDLE hEngine;
@@ -91,7 +179,6 @@ int main()
         if (error != ERROR_SUCCESS)
         {
             printf("FwpmGetAppIdFromFileName failed with error: %d\n", error);
-            free(filterConditions);
             free(processName);
             WSACleanup();
             return 1;
@@ -100,88 +187,16 @@ int main()
 
     if (pAppId)
     {
-        wprintf(L"%.*s", (int)(pAppId->size / sizeof(WCHAR)), (WCHAR*)pAppId->data);
+        wprintf(L"%.*s\n", (int)(pAppId->size / sizeof(WCHAR)), (WCHAR*)pAppId->data);
     }
 
-    for (int i = 0; i < ipStr.size(); i++)
+   for (auto el : ipStr)
     {
-        ZeroMemory(&filterConditions[i], sizeof(FWPM_FILTER_CONDITION));
-    }
-    filterConditions[0].fieldKey = FWPM_CONDITION_ALE_APP_ID;
-    filterConditions[0].matchType = FWP_MATCH_EQUAL;
-    filterConditions[0].conditionValue.type = FWP_BYTE_BLOB_TYPE;
-    filterConditions[0].conditionValue.byteBlob = pAppId;
-
-    for (int i = 1; i < ipStr.size(); i++)
-    {
-        filterConditions[i].fieldKey = FWPM_CONDITION_IP_REMOTE_ADDRESS;
-        filterConditions[i].matchType = FWP_MATCH_EQUAL;
-
-		wstring ip = ipStr[i];
-
-        IN_ADDR ipv4;
-        if (InetPtonW(AF_INET, ip.c_str(), &ipv4) == 1)
+        if (AddFilter(hEngine, pAppId, el) != 0)
         {
-            FWP_V4_ADDR_AND_MASK* ipAddrMask = (FWP_V4_ADDR_AND_MASK*)malloc(sizeof(FWP_V4_ADDR_AND_MASK));
-            if (!ipAddrMask)
-            {
-                free(filterConditions);
-                free(nodeName);
-                WSACleanup();
-                return 1;
-			}
-
-            ZeroMemory(ipAddrMask, sizeof(FWP_V4_ADDR_AND_MASK));
-
-            ipAddrMask->addr = ipv4.S_un.S_addr;
-            ipAddrMask->mask = 0xFFFFFFFF;
-
-            filterConditions[i].conditionValue.type = FWP_V4_ADDR_MASK;
-            filterConditions[i].conditionValue.v4AddrMask = ipAddrMask;
+            printf("Failed to add filter for IP: %ls\n", el.c_str());
         }
-        else
-        {
-            IN6_ADDR ipv6;
-            if (InetPtonW(AF_INET6, ip.c_str(), &ipv6) == 1)
-            {
-                FWP_V6_ADDR_AND_MASK* ipAddrMask = (FWP_V6_ADDR_AND_MASK*)malloc(sizeof(FWP_V6_ADDR_AND_MASK));
-                if (!ipAddrMask)
-                {
-                    free(filterConditions);
-                    free(nodeName);
-                    WSACleanup();
-                    return 1;
-                }
-
-                ZeroMemory(ipAddrMask, sizeof(FWP_V6_ADDR_AND_MASK));
-
-                memcpy(&ipAddrMask->addr, &ipv6, sizeof(IN6_ADDR));
-                ipAddrMask->prefixLength = 128;
-
-                filterConditions[i].conditionValue.type = FWP_V6_ADDR_MASK;
-                filterConditions[i].conditionValue.v6AddrMask = ipAddrMask;
-            }
-        }
-    }
-
-    ZeroMemory(&filter, sizeof(FWPM_FILTER));
-    filter.displayData.name = nodeName;
-    filter.displayData.description = NULL;
-    filter.layerKey = FWPM_LAYER_ALE_AUTH_CONNECT_V4;
-    filter.weight.type = FWP_EMPTY;
-    filter.numFilterConditions = ipStr.size() + 1;
-    filter.filterCondition = filterConditions;
-    filter.action.type = FWP_ACTION_BLOCK;
-
-    int res = FwpmFilterAdd(hEngine, &filter, NULL, NULL);
-    if (res != ERROR_SUCCESS)
-    {
-        printf("FwpmFilterAdd failed with error: %d\n", res);
-        free(filterConditions);
-        free(nodeName);
-        WSACleanup();
-        return 1;
-    }
+   }
 
 	printf("Press ESC to stop blocking...\n");
     while (true)
@@ -197,11 +212,8 @@ int main()
         }
     }
 
-    FwpmFilterDeleteById(hEngine, filter.filterId);
-
     FwpmEngineClose(hEngine);
 
-    free(filterConditions);
     free(nodeName);
 
     WSACleanup();
