@@ -422,7 +422,7 @@ void GetICMPv4TypeValue(UINT8 ICMPIndex, WCHAR* ICMPTypeValue)
 BOOLEAN IsHandleSocket(HANDLE handle)
 {
     // Uncommenting __debugbreak() shows that it works but not always. sometimes the fileObject is garbage. Don't know how to fix + never detects remote shells
-     //__debugbreak();
+    //__debugbreak();
     PFILE_OBJECT fileObject = NULL;
 
     NTSTATUS status = ObReferenceObjectByHandle(
@@ -697,14 +697,14 @@ VOID WorkerForReverseShellDetection(PVOID ctx)
 {
     UNREFERENCED_PARAMETER(ctx);
 
-    //__debugbreak();
+    __debugbreak();
     // Commented because it causes bugcheck sometimes, i dont know why. It also doesnt detect reverse shell but the is handle socket sometimes acuatlly has values inside of variabiles but most times it's just garbage.
-	/*PREV_SHELL_CTX revShellCtx = (PREV_SHELL_CTX)ctx;
+	PREV_SHELL_CTX revShellCtx = (PREV_SHELL_CTX)ctx;
 
-    if (KeGetCurrentIrql() == DISPATCH_LEVEL)
+    /*if (KeGetCurrentIrql() == DISPATCH_LEVEL)
     {
         goto notCool;
-    }
+    }*/
 
 	HANDLE hProcess = revShellCtx->processHandle;
 
@@ -718,8 +718,9 @@ VOID WorkerForReverseShellDetection(PVOID ctx)
     {
         goto notCool;
     }
-
-    KeAttachProcess(process);
+    
+	KAPC_STATE apcState;
+	KeStackAttachProcess(process, &apcState);
 
     PPEB peb = PsGetProcessPeb(process);
     UNREFERENCED_PARAMETER(peb);
@@ -754,13 +755,13 @@ VOID WorkerForReverseShellDetection(PVOID ctx)
         ObDereferenceObject(process);
     }
 
-    KeDetachProcess();
+    KeUnstackDetachProcess(&apcState);
 
 notCool:;
     ExFreePoolWithTag(
         revShellCtx,
         'rscx'
-    );*/
+    );
 }
 
 void NTAPI
@@ -836,7 +837,7 @@ DefaultClassifyFn(
 	context->protocol = protocol->value.uint8;
     context->icmpType = icmp->value.uint8;
     
-    /*if (inMetaValues->currentMetadataValues & FWPS_METADATA_FIELD_PROCESS_ID)
+    if (inMetaValues->currentMetadataValues & FWPS_METADATA_FIELD_PROCESS_ID)
     {
 		PREV_SHELL_CTX revShellCtx = NULL;
         revShellCtx = ExAllocatePool2(
@@ -848,10 +849,10 @@ DefaultClassifyFn(
         HANDLE hProcess = (HANDLE)inMetaValues->processId;
 		revShellCtx->processHandle = hProcess;
 
-        //TpEnqueueWorkItem(&gThreadPool->tp, WorkerForReverseShellDetection, revShellCtx);
+        TpEnqueueWorkItem(&gThreadPool->tp, WorkerForReverseShellDetection, revShellCtx);
 
 
-    }*/
+    }
 
     //WCHAR localIpBuffer[100];
     switch (localAddress->value.type)
