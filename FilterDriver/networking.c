@@ -419,49 +419,6 @@ void GetICMPv4TypeValue(UINT8 ICMPIndex, WCHAR* ICMPTypeValue)
     }
 }
 
-BOOLEAN IsHandleSocket(HANDLE handle)
-{
-    // Uncommenting __debugbreak() shows that it works but not always. sometimes the fileObject is garbage. Don't know how to fix + never detects remote shells
-    //__debugbreak();
-    PFILE_OBJECT fileObject = NULL;
-
-    NTSTATUS status = ObReferenceObjectByHandle(
-        handle,
-        FILE_READ_DATA,
-        *IoFileObjectType,
-        KernelMode,
-        (PVOID*)&fileObject,
-        NULL
-    );
-
-    if (!NT_SUCCESS(status))
-    {
-        return FALSE;
-    }
-
-    BOOLEAN isSocket = FALSE;
-    if (fileObject->DeviceObject && fileObject->DeviceObject->DriverObject)
-    {
-        UNICODE_STRING afd = { 0 };
-
-		RtlInitUnicodeString(&afd, L"\\Driver\\Afd.sys");
-
-        if (RtlEqualUnicodeString(&fileObject->DeviceObject->DriverObject->DriverName, &afd, TRUE))
-        {
-            isSocket = TRUE;
-		}
-    }
-
-    ObDereferenceObject(fileObject);
-    return isSocket;
-}
-
-typedef NTSTATUS(WINAPI* NQIP)(HANDLE, PROCESSINFOCLASS, PVOID, ULONG, PULONG);
-
-NTKERNELAPI PPEB PsGetProcessPeb(
-    _In_ PEPROCESS Process
-);
-
 VOID SendWorkerNetwork(PVOID ctx)
 {
     PMY_NETWORK_CONTEXT data = (PMY_NETWORK_CONTEXT)ctx;
@@ -693,77 +650,6 @@ VOID SendWorkerNetwork(PVOID ctx)
     }
 }
 
-VOID WorkerForReverseShellDetection(PVOID ctx)
-{
-    UNREFERENCED_PARAMETER(ctx);
-
-    __debugbreak();
-    // Commented because it causes bugcheck sometimes, i dont know why. It also doesnt detect reverse shell but the is handle socket sometimes acuatlly has values inside of variabiles but most times it's just garbage.
-	PREV_SHELL_CTX revShellCtx = (PREV_SHELL_CTX)ctx;
-
-    /*if (KeGetCurrentIrql() == DISPATCH_LEVEL)
-    {
-        goto notCool;
-    }*/
-
-	HANDLE hProcess = revShellCtx->processHandle;
-
-    PEPROCESS process;
-    NTSTATUS status = PsLookupProcessByProcessId(hProcess, &process);
-
-    PROCESS_BASIC_INFORMATION processInformation;
-    UNREFERENCED_PARAMETER(processInformation);
-
-    if (!NT_SUCCESS(status))
-    {
-        goto notCool;
-    }
-    
-	KAPC_STATE apcState;
-	KeStackAttachProcess(process, &apcState);
-
-    PPEB peb = PsGetProcessPeb(process);
-    UNREFERENCED_PARAMETER(peb);
-
-    PRTL_USER_PROCESS_PARAMETERS params = peb->ProcessParameters;
-    UNREFERENCED_PARAMETER(params);
-
-    HANDLE stdIn = params->StdInputHandle;
-	HANDLE stdOut = params->StdOutputHandle;
-	HANDLE stdErr = params->StdErrorHandle;
-
-	BOOLEAN isSocket = IsHandleSocket(stdIn);
-    if (isSocket)
-    {
-		DbgPrintEx(0, 0, "Process %d has a socket as standard input handle. Possible reverse shell.\n", (ULONG)(ULONG_PTR)hProcess);
-    }
-
-	isSocket = IsHandleSocket(stdOut);
-    if (isSocket)
-    {
-        DbgPrintEx(0, 0, "Process %d has a socket as standard input handle. Possible reverse shell.\n", (ULONG)(ULONG_PTR)hProcess);
-    }
-
-	isSocket = IsHandleSocket(stdErr);
-    if (isSocket)
-    {
-        DbgPrintEx(0, 0, "Process %d has a socket as standard input handle. Possible reverse shell.\n", (ULONG)(ULONG_PTR)hProcess);
-	}
-
-    if (process)
-    {
-        ObDereferenceObject(process);
-    }
-
-    KeUnstackDetachProcess(&apcState);
-
-notCool:;
-    ExFreePoolWithTag(
-        revShellCtx,
-        'rscx'
-    );
-}
-
 void NTAPI
 DefaultClassifyFn(
     _In_ const FWPS_INCOMING_VALUES0* inFixedValues,
@@ -836,23 +722,6 @@ DefaultClassifyFn(
 
 	context->protocol = protocol->value.uint8;
     context->icmpType = icmp->value.uint8;
-    
-    if (inMetaValues->currentMetadataValues & FWPS_METADATA_FIELD_PROCESS_ID)
-    {
-		PREV_SHELL_CTX revShellCtx = NULL;
-        revShellCtx = ExAllocatePool2(
-            POOL_FLAG_NON_PAGED,
-            sizeof(PREV_SHELL_CTX),
-            'rscx'
-        );
-
-        HANDLE hProcess = (HANDLE)inMetaValues->processId;
-		revShellCtx->processHandle = hProcess;
-
-        TpEnqueueWorkItem(&gThreadPool->tp, WorkerForReverseShellDetection, revShellCtx);
-
-
-    }
 
     //WCHAR localIpBuffer[100];
     switch (localAddress->value.type)
