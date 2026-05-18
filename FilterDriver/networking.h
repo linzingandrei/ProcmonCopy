@@ -79,7 +79,8 @@ typedef struct _PEB {
 
 typedef struct _REV_SHELL_CTX
 {
-    HANDLE processHandle;
+    //HANDLE processHandle;
+	PEPROCESS process;
 } REV_SHELL_CTX, *PREV_SHELL_CTX;
 
 VOID

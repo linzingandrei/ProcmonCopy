@@ -847,7 +847,7 @@ DefaultClassifyFn(
     break;
     }
 
-	DbgPrintEx(0, 0, "gNetworkMonitoringEnabled: %d\n", gNetworkMonitoringEnabled);
+	//DbgPrintEx(0, 0, "gNetworkMonitoringEnabled: %d\n", gNetworkMonitoringEnabled);
     TpEnqueueWorkItem(&gThreadPool->tp, SendWorkerNetwork, context);
 }
 

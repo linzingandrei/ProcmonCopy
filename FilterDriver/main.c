@@ -874,23 +874,23 @@ VOID WorkerForReverseShellDetection(PVOID ctx)
         goto notCool;
     }*/
 
-    HANDLE hProcess = revShellCtx->processHandle;
+    //HANDLE hProcess = revShellCtx->pro;
 
-    PEPROCESS process;
-    NTSTATUS status = PsLookupProcessByProcessId(hProcess, &process);
+    //PEPROCESS process;
+    //NTSTATUS status = PsLookupProcessByProcessId(hProcess, &process);
 
-    PROCESS_BASIC_INFORMATION processInformation;
+  /*  PROCESS_BASIC_INFORMATION processInformation;
     UNREFERENCED_PARAMETER(processInformation);
 
     if (!NT_SUCCESS(status))
     {
         goto notCool;
-    }
+    }*/
 
     KAPC_STATE apcState;
-    KeStackAttachProcess(process, &apcState);
+    KeStackAttachProcess(revShellCtx->process, &apcState);
 
-    PPEB peb = PsGetProcessPeb(process);
+    PPEB peb = PsGetProcessPeb(revShellCtx->process);
     UNREFERENCED_PARAMETER(peb);
 
     PRTL_USER_PROCESS_PARAMETERS params = peb->ProcessParameters;
@@ -903,29 +903,29 @@ VOID WorkerForReverseShellDetection(PVOID ctx)
     BOOLEAN isSocket = IsHandleSocket(stdIn);
     if (isSocket)
     {
-        DbgPrintEx(0, 0, "Process %d has a socket as standard input handle. Possible reverse shell.\n", (ULONG)(ULONG_PTR)hProcess);
+        DbgPrintEx(0, 0, "Process %d has a socket as standard input handle. Possible reverse shell.\n");
     }
 
     isSocket = IsHandleSocket(stdOut);
     if (isSocket)
     {
-        DbgPrintEx(0, 0, "Process %d has a socket as standard input handle. Possible reverse shell.\n", (ULONG)(ULONG_PTR)hProcess);
+        DbgPrintEx(0, 0, "Process %d has a socket as standard input handle. Possible reverse shell.\n");
     }
 
     isSocket = IsHandleSocket(stdErr);
     if (isSocket)
     {
-        DbgPrintEx(0, 0, "Process %d has a socket as standard input handle. Possible reverse shell.\n", (ULONG)(ULONG_PTR)hProcess);
+        DbgPrintEx(0, 0, "Process %d has a socket as standard input handle. Possible reverse shell.\n");
     }
 
-    if (process)
+   /* if (revShellCtx->process)
     {
-        ObDereferenceObject(process);
-    }
+        ObDereferenceObject(revShellCtx->process);
+    }*/
 
     KeUnstackDetachProcess(&apcState);
 
-notCool:;
+//notCool:;
     ExFreePoolWithTag(
         revShellCtx,
         'rscx'
@@ -934,6 +934,7 @@ notCool:;
 
 void
 ProcFltSendMessageProcessCreate(
+    PEPROCESS Process,
     HANDLE ProcessId,
     PPS_CREATE_NOTIFY_INFO CreateInfo
 )
@@ -959,10 +960,10 @@ ProcFltSendMessageProcessCreate(
         'rscx'
     );
 
-    HANDLE hProcess = (HANDLE)ProcessId;
-    revShellCtx->processHandle = hProcess;
+    //HANDLE hProcess = (HANDLE)ProcessId;
+    revShellCtx->process = Process;
 
-    TpEnqueueWorkItem(&gThreadPool->tp, WorkerForReverseShellDetection, revShellCtx);
+	WorkerForReverseShellDetection(revShellCtx);
 
     LARGE_INTEGER timestamp;
     KeQuerySystemTime(&timestamp);
@@ -1049,7 +1050,7 @@ ProcessFltNotifyRoutine(
     if (CreateInfo)
     {
         //__debugbreak();
-        ProcFltSendMessageProcessCreate(ProcessId, CreateInfo);
+        ProcFltSendMessageProcessCreate(Process, ProcessId, CreateInfo);
     }
     else
     {
